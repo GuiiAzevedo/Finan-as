@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance App Minimal</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        :root {
+            --bg: #0b0f1a;
+            --card: #161c2d;
+            --text: #e2e8f0;
+            --accent: #6366f1;
+            --entry: #10b981;
+            --exit: #f43f5e;
+            --input-bg: #1e293b;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container { width: 100%; max-width: 600px; padding-bottom: 50px; }
+
+        /* Dashboard */
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .card {
+            background: var(--card);
+            padding: 15px;
+            border-radius: 16px;
+            text-align: center;
+            border: 1px solid #2d3748;
+        }
+
+        .card small { font-size: 0.7rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
+        .card div { font-size: 1.1rem; font-weight: 700; margin-top: 5px; }
+
+        /* Formulários */
+        .form-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .box {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 20px;
+            border: 1px solid #2d3748;
+        }
+
+        h3 { font-size: 0.9rem; margin-top: 0; margin-bottom: 15px; font-weight: 500; }
+        .title-entry { color: var(--entry); }
+        .title-exit { color: var(--exit); }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 10px;
+            border: none;
+            background: var(--input-bg);
+            color: white;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        button:active { transform: scale(0.98); }
+
+        .btn-entry { background: var(--entry); color: #fff; }
+        .btn-exit { background: var(--exit); color: #fff; }
+        .btn-pdf { background: #334155; color: white; margin-top: 20px; }
+        .btn-print { background: transparent; color: #94a3b8; border: 1px solid #334155; margin-top: 8px; }
+
+        /* Gráfico e Histórico */
+        .chart-container { 
+            background: var(--card); 
+            padding: 20px; 
+            border-radius: 20px; 
+            margin-bottom: 25px; 
+            min-height: 280px;
+            border: 1px solid #2d3748;
+        }
+        
+        .history { background: var(--card); border-radius: 20px; overflow: hidden; border: 1px solid #2d3748; }
+        .item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #2d3748;
+        }
+
+        .item:last-child { border: none; }
+
+        .item-info { display: flex; flex-direction: column; }
+        .item-info strong { font-size: 0.95rem; }
+        .item-info small { color: #64748b; font-size: 0.75rem; margin-top: 2px; }
+
+        .actions { display: flex; align-items: center; gap: 12px; }
+        .btn-icon { background: none; border: none; cursor: pointer; padding: 5px; font-size: 1.1rem; width: auto; }
+
+        .val-entry { color: var(--entry); }
+        .val-exit { color: var(--exit); }
+
+        /* Impressão */
+        @media print {
+            body { background: white; color: black; }
+            .btn-pdf, .btn-print, .form-section { display: none; }
+            .card, .history, .chart-container { border: 1px solid #ccc; background: white; color: black; }
+        }
+
+        @media (max-width: 480px) {
+            .form-section { grid-template-columns: 1fr; }
+            .dashboard { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container" id="app-content">
+    <h2 style="font-weight: 300; text-align: center; margin-bottom: 30px;">
+        MyFinances <span style="font-weight: 800; color: var(--accent);">Minimal</span>
+    </h2>
+
+    <div class="dashboard">
+        <div class="card"><small>Entradas</small><div id="t-entry" class="val-entry">R$ 0,00</div></div>
+        <div class="card"><small>Saídas</small><div id="t-exit" class="val-exit">R$ 0,00</div></div>
+        <div class="card" style="border-color: var(--accent);"><small>Saldo</small><div id="t-balance">R$ 0,00</div></div>
+    </div>
+
+    <div class="form-section">
+        <div class="box">
+            <h3 class="title-entry">Nova Entrada</h3>
+            <input type="text" id="e-desc" placeholder="Ex: Salário">
+            <input type="number" id="e-val" placeholder="Valor R$">
+            <select id="e-cat">
+                <option value="Renda Fixa">Renda Fixa</option>
+                <option value="Renda Extra">Renda Extra</option>
+                <option value="Outros">Outros</option>
+            </select>
+            <button class="btn-entry" onclick="addItem(true)">Adicionar</button>
+        </div>
+
+        <div class="box">
+            <h3 class="title-exit">Nova Saída</h3>
+            <input type="text" id="s-desc" placeholder="Ex: Aluguel">
+            <input type="number" id="s-val" placeholder="Valor R$">
+            <select id="s-cat">
+                <option value="Moradia">Moradia</option>
+                <option value="Contas">Contas</option>
+                <option value="Cartão de Crédito">Cartão de Crédito</option>
+                <option value="Investimento">Investimento</option>
+                <option value="Alimentação">Alimentação</option>
+                <option value="Lazer">Lazer</option>
+                <option value="Outros">Outros</option>
+            </select>
+            <button class="btn-exit" onclick="addItem(false)">Adicionar</button>
+        </div>
+    </div>
+
+    <div class="chart-container" id="chart-box">
+        <canvas id="myChart"></canvas>
+    </div>
+
+    <div class="history" id="history-list"></div>
+
+    <button class="btn-pdf" onclick="exportPDF()">📄 Gerar Relatório PDF</button>
+    <button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar via Sistema</button>
+    
+    <p onclick="clearData()" style="text-align:center; color:#475569; font-size:0.7rem; cursor:pointer; margin-top:30px;">
+        Clique aqui para apagar todos os dados permanentemente
+    </p>
+</div>
+
+<script>
+    let db = JSON.parse(localStorage.getItem('fin_v3_data')) || [];
+    let myChart;
+
+    function addItem(isEntry) {
+        const p = isEntry ? 'e-' : 's-';
+        const desc = document.getElementById(p+'desc').value;
+        const val = parseFloat(document.getElementById(p+'val').value);
+        const cat = document.getElementById(p+'cat').value;
+
+        if(!desc || isNaN(val)) return alert("Preencha os dados corretamente!");
+
+        db.push({ id: Date.now(), desc, val, cat, type: isEntry ? 'in' : 'out' });
+        saveAndRender();
+        
+        document.getElementById(p+'desc').value = '';
+        document.getElementById(p+'val').value = '';
+    }
+
+    function editItem(id) {
+        const item = db.find(i => i.id === id);
+        const p = item.type === 'in' ? 'e-' : 's-';
+        document.getElementById(p+'desc').value = item.desc;
+        document.getElementById(p+'val').value = item.val;
+        document.getElementById(p+'cat').value = item.cat;
+        
+        db = db.filter(i => i.id !== id);
+        saveAndRender();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function deleteItem(id) {
+        if(confirm("Deseja excluir este item?")) {
+            db = db.filter(i => i.id !== id);
+            saveAndRender();
+        }
+    }
+
+    function saveAndRender() {
+        localStorage.setItem('fin_v3_data', JSON.stringify(db));
+        render();
+    }
+
+    function render() {
+        const list = document.getElementById('history-list');
+        list.innerHTML = '';
+        let inT = 0, outT = 0;
+
+        db.slice().reverse().forEach(i => {
+            if(i.type === 'in') inT += i.val; else outT += i.val;
+            list.innerHTML += `
+                <div class="item">
+                    <div class="item-info">
+                        <strong>${i.desc}</strong>
+                        <small>${i.cat}</small>
+                    </div>
+                    <div class="actions">
+                        <span class="${i.type === 'in' ? 'val-entry' : 'val-exit'}">
+                            ${i.type === 'in' ? '+' : '-'} R$ ${i.val.toFixed(2)}
+                        </span>
+                        <button class="btn-icon" onclick="editItem(${i.id})">✏️</button>
+                        <button class="btn-icon" onclick="deleteItem(${i.id})">🗑️</button>
+                    </div>
+                </div>`;
+        });
+
+        document.getElementById('t-entry').innerText = `R$ ${inT.toFixed(2)}`;
+        document.getElementById('t-exit').innerText = `R$ ${outT.toFixed(2)}`;
+        document.getElementById('t-balance').innerText = `R$ ${(inT - outT).toFixed(2)}`;
+        updateChart();
+    }
+
+    function updateChart() {
+        const ctx = document.getElementById('myChart').getContext('2d');
+        const outData = db.filter(i => i.type === 'out');
+        const cats = [...new Set(outData.map(i => i.cat))];
+        const vals = cats.map(c => outData.filter(i => i.cat === c).reduce((a, b) => a + b.val, 0));
+
+        if(myChart) myChart.destroy();
+        if(vals.length === 0) {
+            document.getElementById('chart-box').style.display = 'none';
+            return;
+        }
+        document.getElementById('chart-box').style.display = 'block';
+
+        myChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: cats,
+                datasets: [{
+                    data: vals,
+                    backgroundColor: ['#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#8b5cf6', '#06b6d4'],
+                    borderWidth: 0
+                }]
+            },
+            options: { 
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 20 } } } 
+            }
+        });
+    }
+
+    function exportPDF() {
+        const element = document.getElementById('app-content');
+        const btn = document.querySelector('.btn-pdf');
+        btn.innerText = "⏳ Gerando...";
+        
+        const opt = {
+            margin: 5,
+            filename: 'Relatorio_Financeiro.pdf',
+            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#0b0f1a' },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        html2pdf().from(element).set(opt).save().then(() => {
+            btn.innerText = "📄 Gerar Relatório PDF";
+        });
+    }
+
+    function clearData() {
+        if(confirm("Isso apagará todos os seus registros. Tem certeza?")) {
+            db = [];
+            saveAndRender();
+        }
+    }
+
+    render();
+</script>
+
+</body>
+</html>
